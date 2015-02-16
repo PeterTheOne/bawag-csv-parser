@@ -1,0 +1,11 @@
+{
+    "name": "petertheone/bawag-csv-parser",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Peter Grassberger",
+            "email": "petergrassberger@gmail.com"
+        }
+    ],
+    "require": {}
+}
