@@ -7,5 +7,7 @@
             "email": "petergrassberger@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "ronanguilloux/isocodes": "1.1.2"
+    }
 }

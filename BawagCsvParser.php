@@ -1,13 +1,13 @@
 <?php
 
-namespace BawagPskParser;
+namespace BawagCsvParser;
 
 /**
  * Class BawagPskParser
  *
  * @package BawagPskParser
  */
-class BawagPskParser {
+class BawagCsvParser {
 
     /**
      * @param $content
