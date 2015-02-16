@@ -24,7 +24,7 @@ class BawagCsvParser {
             //$line = str_replace(["\n", "\t", "\r"],['', '', ''], $line);
             $csvLine = str_getcsv($line, ';');
 
-            $date = new DateTime($csvLine[2]);
+            $date = new \DateTime($csvLine[2]);
 
             // remove leading plus sign
             $csvLine[4] = ltrim($csvLine[4], '+$');
