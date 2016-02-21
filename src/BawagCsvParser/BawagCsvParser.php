@@ -124,7 +124,7 @@ class BawagCsvParser {
     private static function setContraAccount(&$entry, $values) {
         // match iban
         // only matches DE and AT iban's for now.
-        $result = preg_match("/ [A-Z]{2}\d{14,18} /", $values[1], $matches);
+        $result = preg_match("/ [A-Z]{2}\d{14,20} /", $values[1], $matches);
         if ($result === 1 && \IsoCodes\Iban::validate(trim($matches[0]))) {
             $entry->contraAccount = trim($matches[0]);
             return;
@@ -132,7 +132,7 @@ class BawagCsvParser {
 
         $date = new DateTime($entry->valueDate);
         if ($date->format('Y') < 2014) {
-            $result = preg_match("/ \d{11} /", $values[1], $matches);
+            $result = preg_match("/ \d{11}/", $values[1], $matches);
             if ($result === 1) {
                 $entry->contraAccount = trim($matches[0]);
                 return;
@@ -165,9 +165,8 @@ class BawagCsvParser {
 
     private static function setContraName(&$entry, $values) {
         $contraName = '';
-        $split = explode($entry->postingLineId, $values[1], 2);
 
-        // after iban
+        // after contraAccount
         if (strlen($entry->contraAccount) > 0) {
             $split = explode($entry->contraAccount, $values[1], 2);
             if (isset($split[1])) {
@@ -176,8 +175,9 @@ class BawagCsvParser {
         }
         // extract name from before bankleitzahl
         $date = new DateTime($entry->valueDate);
-        if (strlen($contraName) === 0 && $entry->contraBic && $entry->contraBic && $date->format('Y') < 2014) {
-            $split = explode($entry->contraBic, $values[8], 2);
+        if (strlen($contraName) === 0 && $entry->postingLineId && $entry->contraBic && $date->format('Y') < 2014) {
+            $split = explode($entry->postingLineId, $values[1], 2);
+            $split = explode($entry->contraBic, $split[1], 2);
             if (isset($split[0])) {
                 $contraName = trim($split[0]);
             }
