@@ -4,116 +4,190 @@ namespace BawagCsvParser;
 use DateTime;
 
 /**
- * Class BawagPskParser
+ * Class BawagCsvParser
  *
- * @package BawagPskParser
+ * @package BawagCsvParser
  */
 class BawagCsvParser {
 
     /**
      * @param $content
-     * 
-     * @return mixed
+     * @throws \Exception
      */
-    public static function parse($content) {
+    public static function validateCsv($content) {
+        if (!is_string($content)) {
+            throw new \Exception('Argument is not a string.');
+        }
+        if (strlen($content) === 0) {
+            throw new \Exception('Argument is an empty string.');
+        }
         $lines = explode(PHP_EOL, $content);
-        $data = array();
         foreach ($lines as $line) {
             if (strlen($line) === 0) {
                 continue;
             }
-            //$line = str_replace(["\n", "\t", "\r"],['', '', ''], $line);
-            $csvLine = str_getcsv($line, ';');
-
-            $date = new DateTime($csvLine[2]);
-
-            // remove leading plus sign
-            $csvLine[4] = ltrim($csvLine[4], '+$');
-            // remove dot, replace comma by dot.
-            $csvLine[4] = str_replace('.', '', $csvLine[4]);
-            $csvLine[4] = str_replace(',', '.', $csvLine[4]);
-
-            $csvLine[6] = '';
-            $csvLine[7] = '';
-            $csvLine[8] = '';
-            $csvLine[9] = '';
-            $csvLine[10] = '';
-            $csvLine[11] = '';
-
-            // todo: check https://github.com/PPOE/pgacc/blob/master/import.php line 185
-
-
-            // match id
-            $id = '';
-            $result = preg_match("@[A-Z]{2}/\d{9} @", $csvLine[1], $matches);
-            if ($result === 1) {
-                $id = trim($matches[0]);
+            $csvValues = str_getcsv($line, ';');
+            if (count($csvValues) < 6) {
+                throw new \Exception('Argument is an empty string.');
             }
-            $csvLine[7] = $id;
+        }
+    }
 
-            // match iban
-            // only matches DE and AT iban's for now.
-            $iban = '';
-            $result = preg_match("/ [A-Z]{2}\d{16,18} /", $csvLine[1], $matches);
-            if ($result === 1 && \IsoCodes\Iban::validate(trim($matches[0]))) {
-                $iban = trim($matches[0]);
-            } else {
-                if ($date->format('Y') < 2014) {
-                    $result = preg_match("/ \d{11} /", $csvLine[1], $matches);
-                    if ($result === 1) {
-                        $iban = trim($matches[0]);
-                    }
-                }
+    /**
+     * @param $content
+     *
+     * @return mixed
+     * @throws \Exception
+     */
+    public static function parse($content) {
+        BawagCsvParser::validateCsv($content);
+
+        $data = array();
+        $lines = explode(PHP_EOL, $content);
+        foreach ($lines as $line) {
+            if (strlen($line) === 0) {
+                continue;
             }
-            $csvLine[10] = $iban;
-
-            // before id
-            if (strlen($id)> 0) {
-                $split = explode($id, $csvLine[1], 2);
-                if (isset($split[0])) {
-                    $csvLine[6] = trim($split[0]);
-                }
-            }
-
-            // after id and before iban
-            if (isset($split[1]) && strlen($iban) > 0) {
-                $split2 = explode($iban, $split[1], 2);
-                if (isset($split2[0])) {
-                    $csvLine[8] = trim($split2[0]);
-                    $result = preg_match("/ ([a-zA-Z]){4}([a-zA-Z]){2}([0-9a-zA-Z]){2}([0-9a-zA-Z]{3})? /", $split2[0], $matches);
-                    $result2 = preg_match("/ ([0-9]){5} /", $split2[0], $matches2);
-                    if ($result === 1 && \IsoCodes\SwiftBic::validate(trim($matches[0]))) {
-                        $csvLine[9] = trim($matches[0]);
-                    } else if ($result2 === 1 && $date->format('Y') < 2014) {
-                        $csvLine[9] = trim($matches2[0]);
-                    }
-                }
-            }
-
-            // after iban
-            if (strlen($iban) > 0) {
-                $split = explode($iban, $csvLine[1], 2);
-                if (isset($split[1])) {
-                    $csvLine[11] = trim($split[1]);
-                }
-            }
-
-            // extract name from before bankleitzahl
-            if (strlen($csvLine[11]) === 0 && $csvLine[8] && $csvLine[9] && $date->format('Y') < 2014) {
-                $split = explode($csvLine[9], $csvLine[8], 2);
-                if (isset($split[0])) {
-                    $csvLine[11] = trim($split[0]);
-                }
-            }
-
-            // remove duplicate text
-            if ($csvLine[6] && $csvLine[11]) {
-                $csvLine[11] = trim(str_replace($csvLine[6], '', $csvLine[11]));
-            }
-
-            $data[] = $csvLine;
+            $values = str_getcsv($line, ';');
+            $data[] = BawagCsvParser::parseLine($values);
         }
 
         return $data;
+    }
+
+    private static function parseLine($values) {
+        $entry = new \stdClass();
+        BawagCsvParser::setPostingLineId($entry, $values);
+        BawagCsvParser::setAccount($entry, $values);
+        BawagCsvParser::setText($entry, $values);
+        BawagCsvParser::setPostingDate($entry, $values);
+        BawagCsvParser::setValueDate($entry, $values);
+        BawagCsvParser::setAmount($entry, $values);
+        BawagCsvParser::setCurrency($entry, $values);
+        BawagCsvParser::setComment($entry, $values);
+        BawagCsvParser::setContraAccount($entry, $values);
+        BawagCsvParser::setContraBic($entry, $values);
+        BawagCsvParser::setContraName($entry, $values);
+
+        return $entry;
+    }
+
+    private static function setPostingLineId(&$entry, $values) {
+        $result = preg_match("@[A-Z]{2}/\d{9}@", $values[1], $matches);
+        if ($result === 1) {
+            $entry->postingLineId = trim($matches[0]);
+            return;
+        }
+        $entry->postingLineId = '';
+    }
+
+    private static function setAccount(&$entry, $values) {
+        $entry->account = $values[0];
+    }
+
+    private static function setText(&$entry, $values) {
+        $entry->text = $values[1];
+    }
+
+    private static function setPostingDate(&$entry, $values) {
+        $entry->postingDate = $values[3];
+    }
+
+    private static function setValueDate(&$entry, $values) {
+        $entry->valueDate = $values[2];
+    }
+
+    private static function setAmount(&$entry, $values) {
+        // remove leading plus sign
+        $entry->amount = ltrim($values[4], '+$');
+        // remove dot, replace comma by dot.
+        $entry->amount = str_replace('.', '', $entry->amount);
+        $entry->amount = str_replace(',', '.', $entry->amount);
+    }
+
+    private static function setCurrency(&$entry, $values) {
+        $entry->currency = $values[5];
+    }
+
+    private static function setComment(&$entry, $values) {
+        // before id
+        if (strlen($entry->postingLineId) > 0) {
+            $split = explode($entry->postingLineId, $values[1], 2);
+            if (isset($split[0])) {
+                $entry->comment = trim($split[0]);
+                return;
+            }
+        }
+        $entry->comment = '';
+    }
+
+    private static function setContraAccount(&$entry, $values) {
+        // match iban
+        // only matches DE and AT iban's for now.
+        $result = preg_match("/ [A-Z]{2}\d{14,18} /", $values[1], $matches);
+        if ($result === 1 && \IsoCodes\Iban::validate(trim($matches[0]))) {
+            $entry->contraAccount = trim($matches[0]);
+            return;
+        }
+
+        $date = new DateTime($entry->valueDate);
+        if ($date->format('Y') < 2014) {
+            $result = preg_match("/ \d{11} /", $values[1], $matches);
+            if ($result === 1) {
+                $entry->contraAccount = trim($matches[0]);
+                return;
+            }
+        }
+        $entry->contraAccount = '';
+    }
+
+    private static function setContraBic(&$entry, $values) {
+        $split = explode($entry->postingLineId, $values[1], 2);
+
+        // after id and before iban
+        if (isset($split[1]) && strlen($entry->contraAccount) > 0) {
+            $split2 = explode($entry->contraAccount, $split[1], 2);
+            if (isset($split2[0])) {
+                $result = preg_match("/ ([a-zA-Z]){4}([a-zA-Z]){2}([0-9a-zA-Z]){2}([0-9a-zA-Z]{3})? /", $split2[0], $matches);
+                $result2 = preg_match("/ ([0-9]){5} /", $split2[0], $matches2);
+                $date = new DateTime($entry->valueDate);
+                if ($result === 1 && \IsoCodes\SwiftBic::validate(trim($matches[0]))) {
+                    $entry->contraBic = trim($matches[0]);
+                    return;
+                } else if ($result2 === 1 && $date->format('Y') < 2014) {
+                    $entry->contraBic = trim($matches2[0]);
+                    return;
+                }
+            }
+        }
+        $entry->contraBic = '';
+    }
+
+    private static function setContraName(&$entry, $values) {
+        $contraName = '';
+        $split = explode($entry->postingLineId, $values[1], 2);
+
+        // after iban
+        if (strlen($entry->contraAccount) > 0) {
+            $split = explode($entry->contraAccount, $values[1], 2);
+            if (isset($split[1])) {
+                $contraName = trim($split[1]);
+            }
+        }
+        // extract name from before bankleitzahl
+        $date = new DateTime($entry->valueDate);
+        if (strlen($contraName) === 0 && $entry->contraBic && $entry->contraBic && $date->format('Y') < 2014) {
+            $split = explode($entry->contraBic, $values[8], 2);
+            if (isset($split[0])) {
+                $contraName = trim($split[0]);
+            }
+        }
+
+        // remove duplicate text
+        if ($entry->comment && $contraName) {
+            $contraName = trim(str_replace($entry->comment, '', $contraName));
+        }
+
+        $entry->contraName = $contraName;
     }
 }
