@@ -1,6 +1,8 @@
 bawag-csv-parser
 ================
 
+BAWAG P.S.K. Bank CSV export parser.
+
 Usage
 -----
 `$result = \BawagCsvParser\BawagCsvParser::parse($content);`
